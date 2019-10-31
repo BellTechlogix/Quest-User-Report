@@ -38,6 +38,11 @@ $lookup = @{4096="Workstation/Server"; 4098="Disabled Workstation/Server"; 4128=
 528416="Workstation/Server Trusted for Delegation"; 532480="Domain Controller"; 66176="Workstation/Server PWD not Expire"; 
 66178="Disabled Workstation/Server PWD not Expire";512="User Account";514="Disabled User Account";66048="User Account PWD Not Expire";66050="Disabled User Account PWD Not Expire"}
 
+#creates the report folder if it doesn't exist
+if(!(Test-Path -Path $rptfolder)){
+    New-Item -ItemType directory -Path $rptfolder
+}
+
 $qadusers = get-qaduser -searchroot $domainRoot -searchscope subtree -sizelimit 0 -includedproperties displayname,SamAccountName,givenName,sn,UserPrincipalName,memberof,telephoneNumber,mobile,mail,userAccountControl,whenCreated,whenChanged,lastlogondate,dayssincelogon,lastlogontimestamp,employeetype,description,office,City,cn,badPasswordTime,pwdLastSet,LockedOut,accountExpires,ProxyAddresses|Select-Object -Property displayname,SamAccountName,givenName,sn,UserPrincipalName,lastlogontimestamp,@{N='dayssincelogon';E={(new-timespan -start (get-date $_.LastLogonTimestamp -Hour "00" -Minute "00") -End (get-date -Hour "00" -Minute "00")).Days}},employeetype,@{N='userAccountControl';E={$lookup[$_.userAccountControl]}},@{N='Groups';E={[system.String]::Join(", ", ($_.memberof|get-adgroup|select name -expandproperty name))}},telephoneNumber,mobile,mail,whenCreated,whenChanged,description,office,City,badPasswordTime,pwdLastSet,LockedOut,accountExpires,@{N='ProxyAddresses';E={[system.String]::Join(", ", ($_.ProxyAddresses))}}|sort sn
 
 $qadusers|export-csv $rptFolder$runtime-qADUserReport.csv -NoTypeInformation
