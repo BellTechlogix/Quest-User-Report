@@ -23,6 +23,13 @@ $rptfolder = "c:\reports\"
 #mail recipients for sending report
 $recipients = @("BTL SCCM <sccm@belltechlogix.com>","BTL ITAMS <ITAM@belltechlogix.com>")
 
+#from address
+$from = "ADReports@wherever.com"
+
+#smtpserver
+$smtp = "mail.wherever.com"
+
+#Timestamp
 $runtime = Get-Date -Format "yyyyMMMdd"
 
 #deffinition for UAC codes
@@ -31,19 +38,15 @@ $lookup = @{4096="Workstation/Server"; 4098="Disabled Workstation/Server"; 4128=
 528416="Workstation/Server Trusted for Delegation"; 532480="Domain Controller"; 66176="Workstation/Server PWD not Expire"; 
 66178="Disabled Workstation/Server PWD not Expire";512="User Account";514="Disabled User Account";66048="User Account PWD Not Expire";66050="Disabled User Account PWD Not Expire"}
 
+$qadusers = get-qaduser -searchroot $domainRoot -searchscope subtree -sizelimit 0 -includedproperties displayname,SamAccountName,givenName,sn,UserPrincipalName,memberof,telephoneNumber,mobile,mail,userAccountControl,whenCreated,whenChanged,lastlogondate,dayssincelogon,lastlogontimestamp,employeetype,description,office,City,cn,badPasswordTime,pwdLastSet,LockedOut,accountExpires,ProxyAddresses|Select-Object -Property displayname,SamAccountName,givenName,sn,UserPrincipalName,lastlogontimestamp,@{N='dayssincelogon';E={(new-timespan -start (get-date $_.LastLogonTimestamp -Hour "00" -Minute "00") -End (get-date -Hour "00" -Minute "00")).Days}},employeetype,@{N='userAccountControl';E={$lookup[$_.userAccountControl]}},@{N='Groups';E={[system.String]::Join(", ", ($_.memberof|get-adgroup|select name -expandproperty name))}},telephoneNumber,mobile,mail,whenCreated,whenChanged,description,office,City,badPasswordTime,pwdLastSet,LockedOut,accountExpires,@{N='ProxyAddresses';E={[system.String]::Join(", ", ($_.ProxyAddresses))}}|sort sn
 
-#$qadusers = get-qaduser -searchroot "dc=crowley,dc=com" -searchscope subtree -sizelimit 0 -includedproperties displayname,SamAccountName,givenName,sn,UserPrincipalName,memberof,telephoneNumber,mobile,mail,userAccountControl,whenCreated,whenChanged,lastlogondate,dayssincelogon,lastlogontimestamp,description,office,City,cn,DN,badPasswordTime,pwdLastSet,LockedOut,accountExpires,employeetype,ProxyAddresses|Select-Object -Property displayname,SamAccountName,givenName,sn,UserPrincipalName,lastlogontimestamp,@{N='Groups';E={[system.String]::Join(", ", ($_.memberof))}},telephoneNumber,mobile,mail,@{N='userAccountControl';E={$lookup[$_.userAccountControl]}},whenCreated,whenChanged,lastlogondate,dayssincelogon,description,office,City,cn,DN,badPasswordTime,pwdLastSet,LockedOut,accountExpires,employeetype,@{N='ProxyAddresses';E={[system.String]::Join(", ", ($_.ProxyAddresses))}}|sort sn
-
-$qadusers = get-qaduser -searchroot "dc=crowley,dc=com" -searchscope subtree -sizelimit 0 -includedproperties displayname,SamAccountName,givenName,sn,UserPrincipalName,memberof,telephoneNumber,mobile,mail,userAccountControl,whenCreated,whenChanged,lastlogondate,dayssincelogon,lastlogontimestamp,employeetype,description,office,City,cn,badPasswordTime,pwdLastSet,LockedOut,accountExpires,ProxyAddresses|Select-Object -Property displayname,SamAccountName,givenName,sn,UserPrincipalName,lastlogontimestamp,@{N='dayssincelogon';E={(new-timespan -start (get-date $_.LastLogonTimestamp -Hour "00" -Minute "00") -End (get-date -Hour "00" -Minute "00")).Days}},employeetype,@{N='userAccountControl';E={$lookup[$_.userAccountControl]}},@{N='Groups';E={[system.String]::Join(", ", ($_.memberof|get-adgroup|select name -expandproperty name))}},telephoneNumber,mobile,mail,whenCreated,whenChanged,description,office,City,badPasswordTime,pwdLastSet,LockedOut,accountExpires,@{N='ProxyAddresses';E={[system.String]::Join(", ", ($_.ProxyAddresses))}}|sort sn
-
-$qadusers|export-csv C:\Belltech\$runtime-qADUserReport.csv -NoTypeInformation
+$qadusers|export-csv $rptFolder$runtime-qADUserReport.csv -NoTypeInformation
 
 $usercount = $qadusers.Count
 
-$emailBody = "<h1>Crowley Weekly ADUser Report</h1>"
-$emailBody = $emailBody + "<h2>Crowley ADUser Count - '$usercount'</h2>"
+$emailBody = "<h1>$org Weekly ADUser Report</h1>"
+$emailBody = $emailBody + "<h2>$org ADUser Count - '$usercount'</h2>"
 $emailBody = $emailBody + "<p><em>"+(Get-Date -Format 'MMM dd yyyy HH:mm')+"</em></p>"
-#$emailBody = $emailBody + '<h2><img style="font-size: 14px;" src="https://html-online.com/img/6-table-div-html.png" alt="html table div" width="45" /></h2>'
 
 $htmlforEmail = $emailBody + @'
 <h3>Included Fields:</h3>
@@ -145,7 +148,4 @@ $htmlforEmail = $emailBody + @'
 </table>
 '@
 
-#$recipients = @("Chris <cavery@belltechlogix.com>","Kristopher <kroy@belltechlogix.com>","Jason <jcooper1@belltechlogix.com>","Veneita <vwillis@belltechlogix.com>","Audrey <amatlala@belltechlogix.com>","Tim <twheeler@belltechlogix.com>")
-
-$recipients = @("Chris <cavery@belltechlogix.com>","Kristopher <kroy@belltechlogix.com>","Jason <jcooper1@belltechlogix.com>","Veneita <vwillis@belltechlogix.com>","Audrey <amatlala@belltechlogix.com>","Tim <twheeler@belltechlogix.com>","Jared <jglenn@belltechlogix.com>")
-Send-MailMessage -from ADReportsKRoy@crowley.com -to $recipients -subject "AD User Report" -smtpserver mail.crowley.com -BodyAsHtml $htmlforEmail -Attachments C:\Belltech\$runtime-qADUserReport.csv
+Send-MailMessage -from $from -to $recipients -subject "$org - AD User Report" -smtpserver $smtp -BodyAsHtml $htmlforEmail -Attachments $rptFolder$runtime-qADUserReport.csv
